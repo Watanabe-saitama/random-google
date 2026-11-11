@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スロットランダム検索</title>
+  <style>
+    /* 全体リセット & フォント設定 */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle at 50% 30%, #1e1b4b, #0f172a 80%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", Meiryo, sans-serif;
+      color: #ffffff;
+      padding: 20px;
+    }
+
+    /* マシーン本体のコンテナ */
+    .slot-machine {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      border: 4px solid #f59e0b;
+      box-shadow: 0 0 30px rgba(245, 158, 11, 0.3), inset 0 2px 8px rgba(255, 255, 255, 0.2);
+      border-radius: 28px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+
+    /* タイトルロゴ */
+    .title-banner {
+      background: linear-gradient(180deg, #fef08a, #f59e0b 60%, #b45309);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: 1.6rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 0 2px 10px rgba(245, 158, 11, 0.5);
+    }
+
+    /* ステータスバー（キーワード確認用） */
+    .status-panel {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      background: #090d16;
+      border: 1px solid #334155;
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: bold;
+    }
+
+    .status-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-label {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      letter-spacing: 1px;
+    }
+
+    .status-value {
+      color: #38bdf8;
+      font-size: 1.1rem;
+      font-family: monospace;
+      min-height: 1.4rem;
+    }
+
+    /* リール窓のフレーム */
+    .reels-container {
+      width: 100%;
+      background: #020617;
+      border: 3px solid #3b82f6;
+      border-radius: 18px;
+      padding: 14px 10px;
+      display: flex;
+      justify-content: space-around;
+      gap: 8px;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.9), 0 0 15px rgba(59, 130, 246, 0.3);
+      position: relative;
+    }
+
+    /* 各リール */
+    .reel-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .reel-window {
+      width: 100%;
+      height: 90px;
+      background: linear-gradient(180deg, #f8fafc 0%, #ffffff 50%, #e2e8f0 100%);
+      border-radius: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      box-shadow: inset 0 6px 8px rgba(0,0,0,0.35), inset 0 -6px 8px rgba(0,0,0,0.35);
+      border: 2px solid #cbd5e1;
+      padding: 4px;
+    }
+
+    /* 単語表示用テキスト */
+    .symbol {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #1e293b;
+      line-height: 1.2;
+      text-align: center;
+      word-break: break-all;
+    }
+
+    /* 回転中の演出 */
+    .spinning {
+      filter: blur(1px);
+      animation: bounce 0.1s infinite alternate;
+    }
+
+    @keyframes bounce {
+      0% { transform: translateY(-3px); }
+      100% { transform: translateY(3px); }
+    }
+
+    /* メッセージウィンドウ */
+    .message-display {
+      min-height: 44px;
+      width: 100%;
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 6px 12px;
+      font-weight: bold;
+      color: #fbbf24;
+      font-size: 0.9rem;
+    }
+
+    /* 操作ボタン共通 */
+    button {
+      cursor: pointer;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      filter: grayscale(80%);
+    }
+
+    /* 個別ストップボタン */
+    .stop-buttons {
+      width: 100%;
+      display: flex;
+      gap: 10px;
+      justify-content: space-around;
+    }
+
+    .stop-btn {
+      flex: 1;
+      padding: 10px 0;
+      background: linear-gradient(180deg, #ef4444, #b91c1c);
+      color: white;
+      font-size: 0.85rem;
+      border-bottom: 4px solid #7f1d1d;
+      border-radius: 8px;
+    }
+
+    .stop-btn:hover:not(:disabled) {
+      background: linear-gradient(180deg, #f87171, #dc2626);
+    }
+
+    /* アクションボタン群 */
+    .main-controls {
+      width: 100%;
+      display: flex;
+      gap: 10px;
+    }
+
+    .spin-btn {
+      flex: 2;
+      padding: 14px;
+      background: linear-gradient(180deg, #10b981, #047857);
+      color: #ffffff;
+      font-size: 1.05rem;
+      border-bottom: 4px solid #064e3b;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .spin-btn:hover:not(:disabled) {
+      background: linear-gradient(180deg, #34d399, #059669);
+    }
+
+    .all-stop-btn {
+      flex: 1;
+      padding: 14px;
+      background: linear-gradient(180deg, #64748b, #334155);
+      color: #ffffff;
+      font-size: 0.95rem;
+      border-bottom: 4px solid #1e293b;
+    }
+
+    .all-stop-btn:hover:not(:disabled) {
+      background: linear-gradient(180deg, #94a3b8, #475569);
+    }
+
+    /* 検索ボタン */
+    .all-search-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+      color: #ffffff;
+      font-size: 1.05rem;
+      border-bottom: 4px solid #1e40af;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .all-search-btn:hover:not(:disabled) {
+      background: linear-gradient(180deg, #60a5fa, #2563eb);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="slot-machine">
+    <!-- タイトル -->
+    <h1 class="title-banner">★ スロット検索 ★</h1>
+
+    <!-- 検索キーワードプレビュー -->
+    <div class="status-panel">
+      <div class="status-item">
+        <span class="status-label">検索キーワード</span>
+        <span id="keyword-preview" class="status-value">STARTを押してください</span>
+      </div>
+    </div>
+
+    <!-- リール表示枠 -->
+    <div id="reels-frame" class="reels-container">
+      <div class="reel-col">
+        <div class="reel-window"><div id="reel-0" class="symbol">カレー</div></div>
+      </div>
+      <div class="reel-col">
+        <div class="reel-window"><div id="reel-1" class="symbol">埼玉</div></div>
+      </div>
+      <div class="reel-col">
+        <div class="reel-window"><div id="reel-2" class="symbol">距離</div></div>
+      </div>
+    </div>
+
+    <!-- メッセージ欄 -->
+    <div id="message" class="message-display">STARTボタンを押して単語をシャッフル！</div>
+
+    <!-- リール別ストップボタン -->
+    <div class="stop-buttons">
+      <button class="stop-btn" id="stop-0" onclick="stopSingleReel(0)" disabled>STOP 1</button>
+      <button class="stop-btn" id="stop-1" onclick="stopSingleReel(1)" disabled>STOP 2</button>
+      <button class="stop-btn" id="stop-2" onclick="stopSingleReel(2)" disabled>STOP 3</button>
+    </div>
+
+    <!-- メイン操作ボタン -->
+    <div class="main-controls">
+      <button id="spin-button" class="spin-btn" onclick="startSpin()">START</button>
+      <button id="stop-all-button" class="all-stop-btn" onclick="stopAllReels()" disabled>一括停止</button>
+    </div>
+
+    <!-- 検索ボタン -->
+    <button id="search-button" class="all-search-btn" onclick="performSearch()" disabled>🔍 この単語でGoogle検索</button>
+  </div>
+
+  <script>
+    // 単語リストを格納する配列（初期状態は空配列）
+let REEL_WORDS = [[], [], []];
+
+let isSpinning = [false, false, false];
+let reelTimers = [null, null, null];
+let currentResults = ['', '', ''];
+
+// 外部テキストファイルを読み込む非同期関数
+async function loadWordLists() {
+  const fileNames = ['1st.txt', '2nd.txt', '3rd.txt'];
+
+  try {
+    for (let i = 0; i < 3; i++) {
+      const response = await fetch(fileNames[i]);
+      if (!response.ok) {
+        throw new Error(`${fileNames[i]} の読み込みに失敗しました`);
+      }
+      
+      const textData = await response.text();
+
+      // 改行（Windows: \r\n / Mac: \n）で分割し、空行や前後の余白を除去
+      const lines = textData
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      if (lines.length === 0) {
+        throw new Error(`${fileNames[i]} に単語が登録されていません`);
+      }
+
+      REEL_WORDS[i] = lines;
+      // 初期表示として各ファイルの先頭の単語をセット
+      document.getElementById(`reel-${i}`).innerText = REEL_WORDS[i][0];
+      currentResults[i] = REEL_WORDS[i][0];
+    }
+
+    // 読み込み完了後にSTARTボタンを有効化
+    document.getElementById('spin-button').disabled = false;
+    setMessage('単語リストの読み込み完了！STARTを押してください');
+
+  } catch (error) {
+    console.error(error);
+    setMessage(`エラー: ${error.message}`);
+    document.getElementById('spin-button').disabled = true;
+  }
+}
+
+// ページ読み込み時にテキストファイルをフェッチ
+window.addEventListener('DOMContentLoaded', () => {
+  // 読み込み完了までSTARTボタンを一時的に押せなくしておく
+  document.getElementById('spin-button').disabled = true;
+  setMessage('単語ファイルを読み込み中...');
+  loadWordLists();
+});
+
+// スロット回転開始
+function startSpin() {
+  document.getElementById('spin-button').disabled = true;
+  document.getElementById('stop-all-button').disabled = false;
+  document.getElementById('search-button').disabled = true;
+  document.getElementById('keyword-preview').innerText = 'シャッフル中...';
+  setMessage('リールを停止してください');
+
+  for (let i = 0; i < 3; i++) {
+    isSpinning[i] = true;
+    const reelElem = document.getElementById(`reel-${i}`);
+    reelElem.classList.add('spinning');
+    document.getElementById(`stop-${i}`).disabled = false;
+
+    const words = REEL_WORDS[i];
+    reelTimers[i] = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * words.length);
+      reelElem.innerText = words[randomIndex];
+    }, 50 + i * 15);
+  }
+}
+
+// 個別リール停止
+function stopSingleReel(index) {
+  if (!isSpinning[index]) return;
+
+  clearInterval(reelTimers[index]);
+  isSpinning[index] = false;
+
+  const reelElem = document.getElementById(`reel-${index}`);
+  reelElem.classList.remove('spinning');
+
+  const words = REEL_WORDS[index];
+  const finalWord = words[Math.floor(Math.random() * words.length)];
+  reelElem.innerText = finalWord;
+  currentResults[index] = finalWord;
+
+  document.getElementById(`stop-${index}`).disabled = true;
+
+  if (!isSpinning.includes(true)) {
+    onAllReelsStopped();
+  }
+}
+
+// 全てのリールを一括停止
+function stopAllReels() {
+  isSpinning.forEach((spinning, idx) => {
+    if (spinning) {
+      setTimeout(() => stopSingleReel(idx), idx * 150);
+    }
+  });
+  document.getElementById('stop-all-button').disabled = true;
+}
+
+// 全て止まった後の処理
+function onAllReelsStopped() {
+  document.getElementById('spin-button').disabled = false;
+  document.getElementById('stop-all-button').disabled = true;
+
+  const combinedQuery = currentResults.join(' ');
+  document.getElementById('keyword-preview').innerText = combinedQuery;
+  document.getElementById('search-button').disabled = false;
+
+  setMessage(`「${combinedQuery}」で検索できます！`);
+}
+
+// Google検索の実行
+function performSearch() {
+  const query = currentResults.join(' ');
+  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+  window.open(searchUrl, '_blank', 'noopener,noreferrer');
+}
+
+// メッセージ更新
+function setMessage(text) {
+  document.getElementById('message').innerText = text;
+}
+  </script>
+</body>
+</html>
